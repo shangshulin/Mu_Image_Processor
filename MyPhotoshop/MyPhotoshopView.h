@@ -92,6 +92,7 @@ public:
 	afx_msg void OnEdgeDetectionLog();//LoG边缘检测菜单项的处理函数
 	//图像增强
 	afx_msg void OnEnhancement();// 图像增强菜单项的处理函数
+	afx_msg void OnXrayEnhancement();// X射线增强菜单项的处理函数
 	// 频域滤波
 	afx_msg void OnFreqPassFilter();// 高通滤波菜单项的处理函数
 	//滚动条

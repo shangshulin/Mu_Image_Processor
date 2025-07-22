@@ -7,6 +7,8 @@ enum class FilterType {
     Mean,
     Median,
     Max,
+    Min,
+    Gaussian
 };
 
 class CImageProc {

@@ -50,6 +50,6 @@ protected:
 public:
 	afx_msg void OnFileOpen();
 	void ApplyImageEnhancement();
-
+	void ApplyXrayEnhancement();
 	virtual void SetTitle(LPCTSTR lpszTitle);
 };

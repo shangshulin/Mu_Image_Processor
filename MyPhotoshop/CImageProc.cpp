@@ -1363,6 +1363,32 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
     BYTE* tempBuffer = new BYTE[nHeight * rowSize];
     memcpy(tempBuffer, pBits, nHeight * rowSize);
 
+    // 生成高斯核（仅在高斯模糊时使用）
+    std::vector<std::vector<double>> gaussianKernel;
+    if (type == FilterType::Gaussian) {
+        // 计算高斯核
+        double sigma = radius / 3.0; // 通常取半径的1/3
+        int size = 2 * radius + 1;
+        gaussianKernel.resize(size, std::vector<double>(size));
+        double sum = 0.0;
+
+        // 计算高斯核的值
+        for (int y = -radius; y <= radius; ++y) {
+            for (int x = -radius; x <= radius; ++x) {
+                double exponent = -(x * x + y * y) / (2 * sigma * sigma);
+                gaussianKernel[y + radius][x + radius] = std::exp(exponent);
+                sum += gaussianKernel[y + radius][x + radius];
+            }
+        }
+
+        // 归一化高斯核
+        for (int y = 0; y < size; ++y) {
+            for (int x = 0; x < size; ++x) {
+                gaussianKernel[y][x] /= sum;
+            }
+        }
+    }
+	// 遍历图像的每个像素
     for (int y = 0; y < nHeight; ++y) {
         for (int x = 0; x < nWidth; ++x) {
             // 8位灰度图特殊处理
@@ -1370,7 +1396,9 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                 std::vector<BYTE> window;
                 int sum = 0;
                 BYTE maxVal = 0;
+				BYTE minVal = 255;
                 int count = 0;
+				double Gsum = 0.0; // 高斯核加权和
                 for (int dy = -radius; dy <= radius; ++dy) {
                     int ny = y + dy;
                     if (ny < 0 || ny >= nHeight) continue;
@@ -1382,6 +1410,8 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                         if (type == FilterType::Mean) { sum += val; count++; }
                         if (type == FilterType::Median) window.push_back(val);
                         if (type == FilterType::Max) if (val > maxVal) maxVal = val;
+						if (type == FilterType::Min) if (val < minVal) minVal = val;
+                        if (type == FilterType::Gaussian) { Gsum += val * gaussianKernel[dy + radius][dx + radius]; }
                     }
                 }
                 BYTE* pixel = pBits + y * rowSize + x;
@@ -1395,12 +1425,20 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                 else if (type == FilterType::Max) {
                     pixel[0] = maxVal;
                 }
+                else if (type == FilterType::Min) {
+					pixel[0] = minVal;
+                }
+                else if (type == FilterType::Gaussian) {
+                    pixel[0] = static_cast<BYTE>(max(0.0, min(255.0, Gsum)));
+                }
             }
             // 16位图像，转为RGB处理
             else if (nBitCount == 16) {
                 std::vector<BYTE> winR, winG, winB;
                 int sumR = 0, sumG = 0, sumB = 0, count = 0;
                 BYTE maxR = 0, maxG = 0, maxB = 0;
+				BYTE minR = 255, minG = 255, minB = 255;
+                double GsumR = 0.0, GsumG = 0.0, GsumB = 0.0;
                 for (int dy = -radius; dy <= radius; ++dy) {
                     int ny = y + dy;
                     if (ny < 0 || ny >= nHeight) continue;
@@ -1416,6 +1454,16 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                             if (r > maxR) maxR = r;
                             if (g > maxG) maxG = g;
                             if (b > maxB) maxB = b;
+                        }
+						if (type == FilterType::Min) {
+							if (r < minR) minR = r;
+							if (g < minG) minG = g;
+							if (b < minB) minB = b;
+						}
+                        if (type == FilterType::Gaussian) {
+							GsumR += r * gaussianKernel[dy + radius][dx + radius];
+							GsumG += g * gaussianKernel[dy + radius][dx + radius];
+							GsumB += b * gaussianKernel[dy + radius][dx + radius];
                         }
                     }
                 }
@@ -1437,6 +1485,14 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                 else if (type == FilterType::Max) {
                     r = maxR; g = maxG; b = maxB;
                 }
+                else if (type == FilterType::Min) {
+                    r = minR; g = minG; b = minB;
+                }
+				else if (type == FilterType::Gaussian) {
+					r = static_cast<BYTE>(max(0.0, min(255.0, GsumR)));
+					g = static_cast<BYTE>(max(0.0, min(255.0, GsumG)));
+					b = static_cast<BYTE>(max(0.0, min(255.0, GsumB)));
+				}
                 SetColor(pixel, x, y, r, g, b);
             }
             // 24/32位图像
@@ -1445,6 +1501,8 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                     std::vector<BYTE> window;
                     int sum = 0, count = 0;
                     BYTE maxVal = 0;
+					BYTE minVal = 255;
+					double Gsum = 0.0; // 高斯核加权和
                     for (int dy = -radius; dy <= radius; ++dy) {
                         int ny = y + dy;
                         if (ny < 0 || ny >= nHeight) continue;
@@ -1456,6 +1514,10 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                             if (type == FilterType::Mean) { sum += val; count++; }
                             if (type == FilterType::Median) window.push_back(val);
                             if (type == FilterType::Max) if (val > maxVal) maxVal = val;
+							if (type == FilterType::Min) if (val < minVal) minVal = val;
+							if (type == FilterType::Gaussian) {
+								Gsum += val * gaussianKernel[dy + radius][dx + radius];
+							}
                         }
                     }
                     BYTE* pixel = pBits + y * rowSize + x * channels;
@@ -1469,6 +1531,12 @@ void CImageProc::SpatialFilter(int filterSize, FilterType type)
                     else if (type == FilterType::Max) {
                         pixel[c] = maxVal;
                     }
+                    else if (type == FilterType::Min) {
+                        pixel[c] = minVal;
+                    }
+					else if (type == FilterType::Gaussian) {
+						pixel[c] = static_cast<BYTE>(max(0.0, min(255.0, Gsum)));
+					}
                 }
             }
         }
@@ -5659,12 +5727,12 @@ bool CImageProc::RLDecodeImage(const CString& openPath) {
         ifs.close();
         return false;
     }
-// 计算每像素字节数
-int bytePerPixel = bitCount / 8;
-// 计算未压缩数据的总字节数（宽*高*每像素字节数）
-int dataSizeUncompressed = width * height * bytePerPixel;
-// 计算每行填充后的字节数（4字节对齐，BMP格式要求）
-int rowSizePadded = ((width * bitCount + 31) / 32) * 4;
+    // 计算每像素字节数
+    int bytePerPixel = bitCount / 8;
+    // 计算未压缩数据的总字节数（宽*高*每像素字节数）
+    int dataSizeUncompressed = width * height * bytePerPixel;
+    // 计算每行填充后的字节数（4字节对齐，BMP格式要求）
+    int rowSizePadded = ((width * bitCount + 31) / 32) * 4;
 
     std::vector<BYTE> decodedData;
     if (dataSizeUncompressed > 0) {

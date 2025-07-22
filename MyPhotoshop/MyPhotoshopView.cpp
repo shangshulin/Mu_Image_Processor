@@ -57,6 +57,7 @@ BEGIN_MESSAGE_MAP(CMyPhotoshopView, CView)
     ON_COMMAND(ID_EDGE_LOG, &CMyPhotoshopView::OnEdgeDetectionLog)// 边缘检测-LoG算子
     //图像增强
     ON_COMMAND(ID_ENHANCEMENT, &CMyPhotoshopView::OnEnhancement)// 图像增强
+    ON_COMMAND(ID_XrayEnhancement, &CMyPhotoshopView::OnXrayEnhancement)// X光增强
 	// 添加噪声
 	ON_COMMAND(ID_FUNCTION_SALTANDPEPPER, &CMyPhotoshopView::OnFunctionSaltandpepper)// 添加椒盐噪声
 	ON_COMMAND(ID_FUNCTION_IMPULSE, &CMyPhotoshopView::OnFunctionImpulse)// 添加脉冲噪声
@@ -1593,5 +1594,31 @@ void CMyPhotoshopView::OnRLDecode()
             AfxMessageBox(_T("解码成功！"));
             pDoc->UpdateAllViews(nullptr); // 刷新显示
         }
+    }
+}
+
+void CMyPhotoshopView::OnXrayEnhancement()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->ApplyXrayEnhancement();
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("图像增强操作失败"));
     }
 }
