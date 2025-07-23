@@ -117,6 +117,11 @@ public:
 	afx_msg void OnLungThresholdSegmentation();
 	afx_msg void OnLungEdgeMorphological();
 	afx_msg void OnLungRegionGrowing();
+	// 形态学操作
+	afx_msg void OnMorphologicalDilation();
+    afx_msg void OnMorphologicalErosion();
+    afx_msg void OnMorphologicalOpening();
+    afx_msg void OnMorphologicalClosing();
 public:
 	template <typename TExecute, typename TUndo>
 	void AddCommand(TExecute&& executeFunc, TUndo&& undoFunc)

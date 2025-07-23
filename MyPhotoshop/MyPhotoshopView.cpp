@@ -96,6 +96,11 @@ BEGIN_MESSAGE_MAP(CMyPhotoshopView, CView)
     ON_COMMAND(ID_LUNG_THRESHOLD_SEGMENTATION, &CMyPhotoshopView::OnLungThresholdSegmentation)
     ON_COMMAND(ID_LUNG_EDGE_MORPHOLOGICAL, &CMyPhotoshopView::OnLungEdgeMorphological)
     ON_COMMAND(ID_LUNG_REGION_GROWING, &CMyPhotoshopView::OnLungRegionGrowing)
+    // 形态学操作
+    ON_COMMAND(ID_Dilation, &CMyPhotoshopView::OnMorphologicalDilation)
+    ON_COMMAND(ID_Erosion, &CMyPhotoshopView::OnMorphologicalErosion)
+    ON_COMMAND(ID_Opening, &CMyPhotoshopView::OnMorphologicalOpening)
+    ON_COMMAND(ID_Closing, &CMyPhotoshopView::OnMorphologicalClosing)
 
 END_MESSAGE_MAP()
 
@@ -1732,5 +1737,113 @@ void CMyPhotoshopView::OnLungRegionGrowing()
     }
     catch (...) {
         AfxMessageBox(_T("区域生长肺叶分割操作失败"));
+    }
+}
+
+// 形态学膨胀
+void CMyPhotoshopView::OnMorphologicalDilation()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->pImage->MorphologicalDilation(5);
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("形态学膨胀操作失败"));
+    }
+}
+
+// 形态学腐蚀
+void CMyPhotoshopView::OnMorphologicalErosion()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->pImage->MorphologicalErosion(5);
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("形态学腐蚀操作失败"));
+    }
+}
+
+// 形态学开运算
+void CMyPhotoshopView::OnMorphologicalOpening()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->pImage->MorphologicalOpening(5);
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("形态学开运算失败"));
+    }
+}
+
+// 形态学闭运算
+void CMyPhotoshopView::OnMorphologicalClosing()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->pImage->MorphologicalClosing(3);
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("形态学闭运算失败"));
     }
 }

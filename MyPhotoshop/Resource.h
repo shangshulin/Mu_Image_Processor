@@ -110,15 +110,17 @@
 #define ID_LUNG_THRESHOLD_SEGMENTATION  32819
 #define ID_LUNG_EDGE_MORPHOLOGICAL      32820
 #define ID_LUNG_REGION_GROWING          32821
-#define ID_X_32822                      32822
-#define ID_32823                        32823
+#define ID_Dilation                     32822
+#define ID_Erosion                      32823
+#define ID_Opening                      32824
+#define ID_Closing                      32825
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        331
-#define _APS_NEXT_COMMAND_VALUE         32824
+#define _APS_NEXT_COMMAND_VALUE         32826
 #define _APS_NEXT_CONTROL_VALUE         1039
 #define _APS_NEXT_SYMED_VALUE           329
 #endif
