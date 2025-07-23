@@ -27,6 +27,7 @@ public:
     //图片加载与显示
     void OpenFile();
     void LoadBmp(CString stFileName);
+    bool SaveBmp(CString stFileName); // 保存图像
     void ShowBMP(CDC* pDC, int x, int y, int destWidth, int destHeight);
     BYTE* GetPixelPtr(int x, int y);
     void DisplayColor(CClientDC* pDC,int imgX, int imgY, int x, int y);
@@ -37,6 +38,7 @@ public:
 	std::vector<int> CalculateHistogramMix(); // 计算灰度直方图
     std::vector<std::vector<int>> CalculateHistogramRGB();// 计算RGB直方图
 	std::vector<std::vector<int>> Balance_Transformations();    // 直方图均衡化
+    void ApplyCLAHE(int tileSize = 8, double clipLimit = 4.0); // 限制对比度自适应直方图均衡化
     void HistogramMatching(CImageProc& targetImageProc); // 直方图规格化
 
     //风格变换

@@ -348,6 +348,57 @@ void CImageProc::SetColor(BYTE* pixel, int x, int y, BYTE r, BYTE g, BYTE b)
 {
     switch (nBitCount)
     {
+    case 1:
+        // 对于1位图像，需要找到调色板中最接近给定RGB值的颜色索引（只有0和1两个索引）
+        if (pQUAD) {
+            // 计算灰度值
+            int gray = static_cast<int>(0.299 * r + 0.587 * g + 0.114 * b);
+            
+            // 计算与调色板中两个颜色的距离
+            int dist0 = abs(gray - (0.299 * pQUAD[0].rgbRed + 0.587 * pQUAD[0].rgbGreen + 0.114 * pQUAD[0].rgbBlue));
+            int dist1 = abs(gray - (0.299 * pQUAD[1].rgbRed + 0.587 * pQUAD[1].rgbGreen + 0.114 * pQUAD[1].rgbBlue));
+            
+            // 选择最接近的颜色
+            int index = (dist0 <= dist1) ? 0 : 1;
+            
+            // 计算字节中的位位置
+            int bitPos = 7 - (x % 8);
+            
+            // 清除该位
+            *pixel &= ~(1 << bitPos);
+            
+            // 设置新值
+            if (index == 1) {
+                *pixel |= (1 << bitPos);
+            }
+        }
+        break;
+    case 8:
+        // 对于8位图像，需要找到调色板中最接近给定RGB值的颜色索引
+        if (pQUAD) {
+            int closestIndex = 0;
+            int minDistance = 255 * 255 * 3; // 初始化为最大可能距离
+            
+            // 遍历调色板中的所有颜色
+            for (int i = 0; i < 256; i++) {
+                int dr = r - pQUAD[i].rgbRed;
+                int dg = g - pQUAD[i].rgbGreen;
+                int db = b - pQUAD[i].rgbBlue;
+                
+                // 计算欧氏距离的平方
+                int distance = dr * dr + dg * dg + db * db;
+                
+                // 如果找到更接近的颜色，更新最接近的索引
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestIndex = i;
+                }
+            }
+            
+            // 设置像素值为找到的最接近颜色的索引
+            *pixel = (BYTE)closestIndex;
+        }
+        break;
     case 16:
         if (m_bIs565Format)
             *((WORD*)pixel) = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3); // 565格式：5位R, 6位G, 5位B
@@ -692,6 +743,184 @@ std::vector<std::vector<int>> CImageProc::Balance_Transformations()
 
     // 返回均衡化后的三通道直方图数据
     return balancedRgbHistograms;
+}
+
+// 限制对比度自适应直方图均衡化(CLAHE)
+void CImageProc::ApplyCLAHE(int tileSize, double clipLimit)
+{
+    if (!IsValid())
+    {
+        AfxMessageBox(_T("No valid image is loaded."));
+        return;
+    }
+
+    // 获取图像宽高
+    int width = nWidth;
+    int height = nHeight;
+
+    // 确保tileSize是合理的值
+    tileSize = max(4, min(64, tileSize));
+
+    // 计算网格数量
+    int numTilesX = (width + tileSize - 1) / tileSize;  // 向上取整
+    int numTilesY = (height + tileSize - 1) / tileSize; // 向上取整
+
+    // 创建临时图像缓冲区
+    std::vector<BYTE> resultR(width * height);
+    std::vector<BYTE> resultG(width * height);
+    std::vector<BYTE> resultB(width * height);
+
+    // 读取原始图像数据到缓冲区
+    std::vector<BYTE> srcR(width * height);
+    std::vector<BYTE> srcG(width * height);
+    std::vector<BYTE> srcB(width * height);
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            BYTE red, green, blue;
+            GetColor(x, y, red, green, blue);
+            
+            int idx = y * width + x;
+            srcR[idx] = red;
+            srcG[idx] = green;
+            srcB[idx] = blue;
+        }
+    }
+
+    // 对每个通道分别处理
+    auto processChannel = [&](const std::vector<BYTE>& src, std::vector<BYTE>& result) {
+        // 为每个网格创建直方图
+        std::vector<std::vector<int>> tileHistograms(numTilesY * numTilesX, std::vector<int>(256, 0));
+        
+        // 计算每个网格的直方图
+        for (int ty = 0; ty < numTilesY; ++ty) {
+            for (int tx = 0; tx < numTilesX; ++tx) {
+                int tileIdx = ty * numTilesX + tx;
+                
+                // 计算当前网格的边界
+                int startX = tx * tileSize;
+                int endX = min(startX + tileSize, width);
+                int startY = ty * tileSize;
+                int endY = min(startY + tileSize, height);
+                
+                // 统计直方图
+                for (int y = startY; y < endY; ++y) {
+                    for (int x = startX; x < endX; ++x) {
+                        int pixelValue = src[y * width + x];
+                        tileHistograms[tileIdx][pixelValue]++;
+                    }
+                }
+            }
+        }
+        
+        // 对每个网格的直方图进行裁剪和均衡化
+        std::vector<std::vector<int>> mappingFunctions(numTilesY * numTilesX, std::vector<int>(256));
+        
+        for (int tileIdx = 0; tileIdx < numTilesY * numTilesX; ++tileIdx) {
+            // 计算当前网格的像素总数
+            int tileX = tileIdx % numTilesX;
+            int tileY = tileIdx / numTilesX;
+            
+            int startX = tileX * tileSize;
+            int endX = min(startX + tileSize, width);
+            int startY = tileY * tileSize;
+            int endY = min(startY + tileSize, height);
+            
+            int numPixels = (endY - startY) * (endX - startX);
+            
+            // 计算裁剪阈值
+            double clipThreshold = clipLimit * numPixels / 256.0;
+            
+            // 裁剪直方图
+            int clippedPixels = 0;
+            for (int i = 0; i < 256; ++i) {
+                if (tileHistograms[tileIdx][i] > clipThreshold) {
+                    clippedPixels += (tileHistograms[tileIdx][i] - static_cast<int>(clipThreshold));
+                    tileHistograms[tileIdx][i] = static_cast<int>(clipThreshold);
+                }
+            }
+            
+            // 重新分配裁剪的像素
+            int redistributeStep = clippedPixels / 256;
+            int residual = clippedPixels - redistributeStep * 256;
+            
+            for (int i = 0; i < 256; ++i) {
+                tileHistograms[tileIdx][i] += redistributeStep;
+                if (i < residual) {
+                    tileHistograms[tileIdx][i]++;
+                }
+            }
+            
+            // 计算累积分布函数(CDF)
+            std::vector<double> cdf(256, 0.0);
+            cdf[0] = tileHistograms[tileIdx][0] / static_cast<double>(numPixels);
+            
+            for (int i = 1; i < 256; ++i) {
+                cdf[i] = cdf[i-1] + tileHistograms[tileIdx][i] / static_cast<double>(numPixels);
+            }
+            
+            // 创建映射函数
+            for (int i = 0; i < 256; ++i) {
+                mappingFunctions[tileIdx][i] = static_cast<int>(round(cdf[i] * 255.0));
+            }
+        }
+        
+        // 应用双线性插值计算最终结果
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                // 计算像素所在的网格
+                int tileX = min(x / tileSize, numTilesX - 1);
+                int tileY = min(y / tileSize, numTilesY - 1);
+                
+                // 计算像素在网格中的相对位置 (0.0 - 1.0)
+                double xRatio = (x % tileSize) / static_cast<double>(tileSize);
+                double yRatio = (y % tileSize) / static_cast<double>(tileSize);
+                
+                // 处理边界情况
+                int tileXNext = min(tileX + 1, numTilesX - 1);
+                int tileYNext = min(tileY + 1, numTilesY - 1);
+                
+                // 获取四个相邻网格的索引
+                int idx = tileY * numTilesX + tileX;         // 左上
+                int idxRight = tileY * numTilesX + tileXNext; // 右上
+                int idxDown = tileYNext * numTilesX + tileX;  // 左下
+                int idxDiag = tileYNext * numTilesX + tileXNext; // 右下
+                
+                // 获取原始像素值
+                int pixelValue = src[y * width + x];
+                
+                // 应用四个映射函数
+                int mappedTL = mappingFunctions[idx][pixelValue];
+                int mappedTR = mappingFunctions[idxRight][pixelValue];
+                int mappedBL = mappingFunctions[idxDown][pixelValue];
+                int mappedBR = mappingFunctions[idxDiag][pixelValue];
+                
+                // 双线性插值
+                double mappedValue = 
+                    mappedTL * (1 - xRatio) * (1 - yRatio) +
+                    mappedTR * xRatio * (1 - yRatio) +
+                    mappedBL * (1 - xRatio) * yRatio +
+                    mappedBR * xRatio * yRatio;
+                
+                // 存储结果
+                result[y * width + x] = static_cast<BYTE>(round(mappedValue));
+            }
+        }
+    };
+
+    // 处理每个通道
+    processChannel(srcR, resultR);
+    processChannel(srcG, resultG);
+    processChannel(srcB, resultB);
+
+    // 将结果写回图像
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int idx = y * width + x;
+            BYTE* pixel = GetPixelPtr(x, y);
+            SetColor(pixel, x, y, resultR[idx], resultG[idx], resultB[idx]);
+        }
+    }
 }
 
 // 转换为黑白风格

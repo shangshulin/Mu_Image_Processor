@@ -205,14 +205,16 @@ void CMyPhotoshopDoc::ApplyXrayEnhancement()
 		return;
 	}
 
-	// 1. 复制原图像
-	*pTemp1 = *pImage;
-	*pTemp2 = *pImage;
-	// 2. 应用中值滤波
-	pTemp1->SpatialFilter(7, FilterType::Gaussian);
-	// 3. 原图像减去中值滤波结果，得到非锐化掩模
-	pImage->Add(*pTemp1, 1.0, -1.0);
-	// 4. 根据公式 “锐化后的图像 = 原始图像 + 强度 * (非锐化掩模)” 计算增强后的图像
-	pImage->Add(*pTemp2, 0.5, 1.0); // 强度系数为0.5
+	//// 1. 复制原图像
+	//*pTemp1 = *pImage;
+	//*pTemp2 = *pImage;
+	//// 2. 应用中值滤波
+	//pTemp1->SpatialFilter(7, FilterType::Gaussian);
+	//// 3. 原图像减去中值滤波结果，得到非锐化掩模
+	//pImage->Add(*pTemp1, 1.0, -1.0);
+	//// 4. 根据公式 “锐化后的图像 = 原始图像 + 强度 * (非锐化掩模)” 计算增强后的图像
+	//pImage->Add(*pTemp2, 0.5, 1.0); // 强度系数为0.5
+
+	pImage->ApplyCLAHE(8, 2);
 
 }
