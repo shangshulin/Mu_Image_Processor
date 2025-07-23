@@ -20,7 +20,6 @@
 #define IDD_HIGH_FILTERDLG              324
 #define IDD_DIALOG3                     327
 #define IDD_SPECTRUM_DLG                328
-
 #define IDC_STATIC_HISTOGRAM            1000
 #define IDC_STATIC_HISTOGRAM2           1001
 #define IDC_EDIT_ALPHA                  1002
@@ -61,7 +60,6 @@
 #define IDC_SPECTRUM_VIEW               1038
 #define IDC_HIGH_FILTER_TYPE            1039
 #define IDC_LOW_FILTER_TYPE             1040
-// 菜单按键ID
 #define ID_PIXEL_INFO                   32772
 #define ID_VIEW_PIXELINFO               32773
 #define ID_SHOW_HISTOGRAM               32774
@@ -109,13 +107,18 @@
 #define ID_RL_Decode                    32816
 #define ID_XrayEnhancement              32817
 #define ID_CLAHE                        32818
+#define ID_LUNG_THRESHOLD_SEGMENTATION  32819
+#define ID_LUNG_EDGE_MORPHOLOGICAL      32820
+#define ID_LUNG_REGION_GROWING          32821
+#define ID_X_32822                      32822
+#define ID_32823                        32823
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        331
-#define _APS_NEXT_COMMAND_VALUE         32819
+#define _APS_NEXT_COMMAND_VALUE         32824
 #define _APS_NEXT_CONTROL_VALUE         1039
 #define _APS_NEXT_SYMED_VALUE           329
 #endif

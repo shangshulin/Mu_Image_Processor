@@ -92,6 +92,10 @@ BEGIN_MESSAGE_MAP(CMyPhotoshopView, CView)
     ON_COMMAND(ID_COM_PREHENSIVE_DECODE, &CMyPhotoshopView::OnComprehensiveDecode)
     ON_COMMAND(ID_RL_Encode, &CMyPhotoshopView::OnRLEncode)
     ON_COMMAND(ID_RL_Decode, &CMyPhotoshopView::OnRLDecode)
+    // 肺叶分割功能
+    ON_COMMAND(ID_LUNG_THRESHOLD_SEGMENTATION, &CMyPhotoshopView::OnLungThresholdSegmentation)
+    ON_COMMAND(ID_LUNG_EDGE_MORPHOLOGICAL, &CMyPhotoshopView::OnLungEdgeMorphological)
+    ON_COMMAND(ID_LUNG_REGION_GROWING, &CMyPhotoshopView::OnLungRegionGrowing)
 
 END_MESSAGE_MAP()
 
@@ -1648,5 +1652,85 @@ void CMyPhotoshopView::OnCLAHE()
     }
     catch (...) {
         AfxMessageBox(_T("CLAHE操作失败"));
+    }
+}
+
+// 肺叶分割功能实现
+
+void CMyPhotoshopView::OnLungThresholdSegmentation()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->pImage->LungThresholdSegmentation();
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("阈值分割肺叶分割操作失败"));
+    }
+}
+
+void CMyPhotoshopView::OnLungEdgeMorphological()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->pImage->LungEdgeMorphologicalSegmentation();
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("边缘检测+形态学分割操作失败"));
+    }
+}
+
+void CMyPhotoshopView::OnLungRegionGrowing()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+            [pDoc]() {
+                pDoc->pImage->LungRegionGrowingSegmentation();
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("区域生长肺叶分割操作失败"));
     }
 }

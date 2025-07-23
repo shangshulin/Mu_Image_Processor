@@ -6134,3 +6134,451 @@ bool CImageProc::RLDecodeImage(const CString& openPath) {
     ifs.close();
     return true;
 }
+
+// 肺叶分割功能实现
+
+// 形态学膨胀操作
+void CImageProc::MorphologicalDilation(int structSize) {
+    if (!IsValid() || structSize < 3 || structSize % 2 == 0) return;
+    
+    int halfSize = structSize / 2;
+    std::vector<BYTE> tempData(nWidth * nHeight);
+    
+    for (int y = 0; y < nHeight; y++) {
+        for (int x = 0; x < nWidth; x++) {
+            BYTE maxVal = 0;
+            
+            // 在结构元素范围内寻找最大值
+            for (int dy = -halfSize; dy <= halfSize; dy++) {
+                for (int dx = -halfSize; dx <= halfSize; dx++) {
+                    int ny = y + dy;
+                    int nx = x + dx;
+                    
+                    if (ny >= 0 && ny < nHeight && nx >= 0 && nx < nWidth) {
+                        BYTE* pixel = GetPixelPtr(nx, ny);
+                        BYTE gray = 0;
+                        
+                        if (nBitCount == 8) {
+                            gray = *pixel;
+                        } else if (nBitCount == 24) {
+                            gray = (BYTE)(0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0]);
+                        }
+                        
+                        if (gray > maxVal) maxVal = gray;
+                    }
+                }
+            }
+            
+            tempData[y * nWidth + x] = maxVal;
+        }
+    }
+    
+    // 将结果复制回原图像
+    for (int y = 0; y < nHeight; y++) {
+        for (int x = 0; x < nWidth; x++) {
+            BYTE* pixel = GetPixelPtr(x, y);
+            BYTE gray = tempData[y * nWidth + x];
+            
+            if (nBitCount == 8) {
+                *pixel = gray;
+            } else if (nBitCount == 24) {
+                pixel[0] = pixel[1] = pixel[2] = gray;
+            }
+        }
+    }
+}
+
+// 形态学腐蚀操作
+void CImageProc::MorphologicalErosion(int structSize) {
+    if (!IsValid() || structSize < 3 || structSize % 2 == 0) return;
+    
+    int halfSize = structSize / 2;
+    std::vector<BYTE> tempData(nWidth * nHeight);
+    
+    for (int y = 0; y < nHeight; y++) {
+        for (int x = 0; x < nWidth; x++) {
+            BYTE minVal = 255;
+            
+            // 在结构元素范围内寻找最小值
+            for (int dy = -halfSize; dy <= halfSize; dy++) {
+                for (int dx = -halfSize; dx <= halfSize; dx++) {
+                    int ny = y + dy;
+                    int nx = x + dx;
+                    
+                    if (ny >= 0 && ny < nHeight && nx >= 0 && nx < nWidth) {
+                        BYTE* pixel = GetPixelPtr(nx, ny);
+                        BYTE gray = 0;
+                        
+                        if (nBitCount == 8) {
+                            gray = *pixel;
+                        } else if (nBitCount == 24) {
+                            gray = (BYTE)(0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0]);
+                        }
+                        
+                        if (gray < minVal) minVal = gray;
+                    }
+                }
+            }
+            
+            tempData[y * nWidth + x] = minVal;
+        }
+    }
+    
+    // 将结果复制回原图像
+    for (int y = 0; y < nHeight; y++) {
+        for (int x = 0; x < nWidth; x++) {
+            BYTE* pixel = GetPixelPtr(x, y);
+            BYTE gray = tempData[y * nWidth + x];
+            
+            if (nBitCount == 8) {
+                *pixel = gray;
+            } else if (nBitCount == 24) {
+                pixel[0] = pixel[1] = pixel[2] = gray;
+            }
+        }
+    }
+}
+
+// 形态学开运算（先腐蚀后膨胀）
+void CImageProc::MorphologicalOpening(int structSize) {
+    MorphologicalErosion(structSize);
+    MorphologicalDilation(structSize);
+}
+
+// 形态学闭运算（先膨胀后腐蚀）
+void CImageProc::MorphologicalClosing(int structSize) {
+    MorphologicalDilation(structSize);
+    MorphologicalErosion(structSize);
+}
+
+// 阈值分割肺叶分割
+void CImageProc::LungThresholdSegmentation() {
+    if (!IsValid()) return;
+    
+    try {
+        // 1. 转换为灰度图像（如果不是）
+        std::vector<BYTE> grayData(nWidth * nHeight);
+        
+        for (int y = 0; y < nHeight; y++) {
+            for (int x = 0; x < nWidth; x++) {
+                BYTE* pixel = GetPixelPtr(x, y);
+                BYTE gray = 0;
+                
+                if (nBitCount == 8) {
+                    gray = *pixel;
+                } else if (nBitCount == 24) {
+                    gray = (BYTE)(0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0]);
+                } else if (nBitCount == 32) {
+                    gray = (BYTE)(0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0]);
+                }
+                
+                grayData[y * nWidth + x] = gray;
+            }
+        }
+        
+        // 2. 计算直方图
+        std::vector<int> histogram(256, 0);
+        for (BYTE gray : grayData) {
+            histogram[gray]++;
+        }
+        
+        // 3. Otsu阈值分割
+        int totalPixels = nWidth * nHeight;
+        double sum = 0;
+        for (int i = 0; i < 256; i++) {
+            sum += i * histogram[i];
+        }
+        
+        double sumB = 0;
+        int wB = 0;
+        int wF = 0;
+        double varMax = 0;
+        int threshold = 0;
+        
+        for (int t = 0; t < 256; t++) {
+            wB += histogram[t];
+            if (wB == 0) continue;
+            
+            wF = totalPixels - wB;
+            if (wF == 0) break;
+            
+            sumB += (double)(t * histogram[t]);
+            
+            double mB = sumB / wB;
+            double mF = (sum - sumB) / wF;
+            
+            double varBetween = (double)wB * (double)wF * (mB - mF) * (mB - mF);
+            
+            if (varBetween > varMax) {
+                varMax = varBetween;
+                threshold = t;
+            }
+        }
+        
+        // 4. 应用阈值分割
+        for (int y = 0; y < nHeight; y++) {
+            for (int x = 0; x < nWidth; x++) {
+                BYTE gray = grayData[y * nWidth + x];
+                BYTE* pixel = GetPixelPtr(x, y);
+                
+                // 肺部区域通常较暗，所以反转阈值
+                BYTE result = (gray < threshold) ? 255 : 0;
+                
+                if (nBitCount == 8) {
+                    *pixel = result;
+                } else if (nBitCount == 24) {
+                    pixel[0] = pixel[1] = pixel[2] = result;
+                } else if (nBitCount == 32) {
+                    pixel[0] = pixel[1] = pixel[2] = result;
+                }
+            }
+        }
+        
+        // 5. 形态学后处理（去噪声）
+        MorphologicalOpening(3);
+        MorphologicalClosing(5);
+        
+        AfxMessageBox(_T("阈值分割肺叶分割完成！"));
+        
+    } catch (...) {
+        AfxMessageBox(_T("阈值分割处理过程中发生错误！"));
+    }
+}
+
+// 边缘检测+形态学操作分割
+void CImageProc::LungEdgeMorphologicalSegmentation() {
+    if (!IsValid()) return;
+    
+    try {
+        // 1. 保存原始图像
+        std::vector<BYTE> originalData;
+        int bytesPerPixel = nBitCount / 8;
+        int rowBytes = ((nWidth * nBitCount + 31) / 32) * 4;
+        
+        for (int y = 0; y < nHeight; y++) {
+            BYTE* row = pBits + y * rowBytes;
+            for (int x = 0; x < nWidth; x++) {
+                for (int b = 0; b < bytesPerPixel; b++) {
+                    originalData.push_back(row[x * bytesPerPixel + b]);
+                }
+            }
+        }
+        
+        // 2. 应用Sobel边缘检测
+        ApplySobelEdgeDetection();
+        
+        // 3. 二值化边缘图像
+        for (int y = 0; y < nHeight; y++) {
+            for (int x = 0; x < nWidth; x++) {
+                BYTE* pixel = GetPixelPtr(x, y);
+                BYTE gray = 0;
+                
+                if (nBitCount == 8) {
+                    gray = *pixel;
+                } else if (nBitCount == 24) {
+                    gray = (BYTE)(0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0]);
+                }
+                
+                BYTE result = (gray > 50) ? 255 : 0;  // 边缘阈值
+                
+                if (nBitCount == 8) {
+                    *pixel = result;
+                } else if (nBitCount == 24) {
+                    pixel[0] = pixel[1] = pixel[2] = result;
+                }
+            }
+        }
+        
+        // 4. 形态学闭运算连接边缘
+        MorphologicalClosing(7);
+        
+        // 5. 填充内部区域（简单的种子填充）
+        std::vector<std::vector<bool>> visited(nHeight, std::vector<bool>(nWidth, false));
+        
+        for (int y = 1; y < nHeight - 1; y++) {
+            for (int x = 1; x < nWidth - 1; x++) {
+                if (!visited[y][x]) {
+                    BYTE* pixel = GetPixelPtr(x, y);
+                    BYTE gray = (nBitCount == 8) ? *pixel : pixel[0];
+                    
+                    if (gray == 0) {  // 内部区域
+                        // 简单的区域填充
+                        std::queue<std::pair<int, int>> queue;
+                        queue.push({x, y});
+                        visited[y][x] = true;
+                        
+                        while (!queue.empty()) {
+                            auto [cx, cy] = queue.front();
+                            queue.pop();
+                            
+                            BYTE* cpixel = GetPixelPtr(cx, cy);
+                            if (nBitCount == 8) {
+                                *cpixel = 128;  // 标记为肺部区域
+                            } else if (nBitCount == 24) {
+                                cpixel[0] = cpixel[1] = cpixel[2] = 128;
+                            }
+                            
+                            // 检查4邻域
+                            int dx[] = {-1, 1, 0, 0};
+                            int dy[] = {0, 0, -1, 1};
+                            
+                            for (int i = 0; i < 4; i++) {
+                                int nx = cx + dx[i];
+                                int ny = cy + dy[i];
+                                
+                                if (nx >= 0 && nx < nWidth && ny >= 0 && ny < nHeight && !visited[ny][nx]) {
+                                    BYTE* npixel = GetPixelPtr(nx, ny);
+                                    BYTE ngray = (nBitCount == 8) ? *npixel : npixel[0];
+                                    
+                                    if (ngray == 0) {
+                                        queue.push({nx, ny});
+                                        visited[ny][nx] = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        AfxMessageBox(_T("边缘检测+形态学分割完成！"));
+        
+    } catch (...) {
+        AfxMessageBox(_T("边缘检测+形态学分割处理过程中发生错误！"));
+    }
+}
+
+// 区域生长分割
+void CImageProc::LungRegionGrowingSegmentation() {
+    if (!IsValid()) return;
+    
+    try {
+        // 1. 转换为灰度图像
+        std::vector<BYTE> grayData(nWidth * nHeight);
+        
+        for (int y = 0; y < nHeight; y++) {
+            for (int x = 0; x < nWidth; x++) {
+                BYTE* pixel = GetPixelPtr(x, y);
+                BYTE gray = 0;
+                
+                if (nBitCount == 8) {
+                    gray = *pixel;
+                } else if (nBitCount == 24) {
+                    gray = (BYTE)(0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0]);
+                } else if (nBitCount == 32) {
+                    gray = (BYTE)(0.299 * pixel[2] + 0.587 * pixel[1] + 0.114 * pixel[0]);
+                }
+                
+                grayData[y * nWidth + x] = gray;
+            }
+        }
+        
+        // 2. 初始化分割结果
+        std::vector<std::vector<int>> segmented(nHeight, std::vector<int>(nWidth, 0));
+        std::vector<std::vector<bool>> visited(nHeight, std::vector<bool>(nWidth, false));
+        
+        // 3. 自动选择种子点（选择图像中心附近的暗区域点）
+        std::vector<std::pair<int, int>> seedPoints;
+        int centerX = nWidth / 2;
+        int centerY = nHeight / 2;
+        int searchRadius = min(nWidth, nHeight) / 6;
+        
+        for (int y = centerY - searchRadius; y <= centerY + searchRadius; y++) {
+            for (int x = centerX - searchRadius; x <= centerX + searchRadius; x++) {
+                if (x >= 0 && x < nWidth && y >= 0 && y < nHeight) {
+                    if (grayData[y * nWidth + x] < 80) {  // 寻找暗区域作为肺部种子
+                        seedPoints.push_back({x, y});
+                    }
+                }
+            }
+        }
+        
+        if (seedPoints.empty()) {
+            // 如果没找到合适的种子点，使用中心点
+            seedPoints.push_back({centerX, centerY});
+        }
+        
+        // 4. 区域生长
+        int regionLabel = 1;
+        const int threshold = 30;  // 灰度差阈值
+        
+        for (auto seed : seedPoints) {
+            int seedX = seed.first;
+            int seedY = seed.second;
+            
+            if (visited[seedY][seedX]) continue;
+            
+            std::queue<std::pair<int, int>> queue;
+            queue.push({seedX, seedY});
+            visited[seedY][seedX] = true;
+            segmented[seedY][seedX] = regionLabel;
+            
+            BYTE seedValue = grayData[seedY * nWidth + seedX];
+            
+            while (!queue.empty()) {
+                auto [x, y] = queue.front();
+                queue.pop();
+                
+                // 检查8邻域
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        if (dx == 0 && dy == 0) continue;
+                        
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        
+                        if (nx >= 0 && nx < nWidth && ny >= 0 && ny < nHeight && !visited[ny][nx]) {
+                            BYTE neighborValue = grayData[ny * nWidth + nx];
+                            
+                            // 检查灰度相似性
+                            if (abs(neighborValue - seedValue) <= threshold) {
+                                queue.push({nx, ny});
+                                visited[ny][nx] = true;
+                                segmented[ny][nx] = regionLabel;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            regionLabel++;
+        }
+        
+        // 5. 将分割结果应用到图像
+        for (int y = 0; y < nHeight; y++) {
+            for (int x = 0; x < nWidth; x++) {
+                BYTE* pixel = GetPixelPtr(x, y);
+                
+                if (segmented[y][x] > 0) {
+                    // 肺部区域显示为白色
+                    if (nBitCount == 8) {
+                        *pixel = 255;
+                    } else if (nBitCount == 24) {
+                        pixel[0] = pixel[1] = pixel[2] = 255;
+                    } else if (nBitCount == 32) {
+                        pixel[0] = pixel[1] = pixel[2] = 255;
+                    }
+                } else {
+                    // 背景区域显示为黑色
+                    if (nBitCount == 8) {
+                        *pixel = 0;
+                    } else if (nBitCount == 24) {
+                        pixel[0] = pixel[1] = pixel[2] = 0;
+                    } else if (nBitCount == 32) {
+                        pixel[0] = pixel[1] = pixel[2] = 0;
+                    }
+                }
+            }
+        }
+        
+        // 6. 形态学后处理
+        MorphologicalOpening(3);
+        MorphologicalClosing(5);
+        
+        AfxMessageBox(_T("区域生长肺叶分割完成！"));
+        
+    } catch (...) {
+        AfxMessageBox(_T("区域生长分割处理过程中发生错误！"));
+    }
+}

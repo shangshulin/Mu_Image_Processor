@@ -113,6 +113,10 @@ public:
 	afx_msg void OnComprehensiveDecode();
 	afx_msg void OnRLEncode();
 	afx_msg void OnRLDecode();
+	// 肺叶分割功能
+	afx_msg void OnLungThresholdSegmentation();
+	afx_msg void OnLungEdgeMorphological();
+	afx_msg void OnLungRegionGrowing();
 public:
 	template <typename TExecute, typename TUndo>
 	void AddCommand(TExecute&& executeFunc, TUndo&& undoFunc)

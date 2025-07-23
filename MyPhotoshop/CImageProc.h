@@ -61,6 +61,17 @@ public:
     void ApplyCannyEdgeDetection(); // Canny边缘检测
     void ApplyLoGEdgeDetection(); // LoG边缘检测
 
+    // 肺叶分割功能
+    void LungThresholdSegmentation(); // 阈值分割
+    void LungEdgeMorphologicalSegmentation(); // 边缘检测+形态学操作分割
+    void LungRegionGrowingSegmentation(); // 区域生长分割
+    
+    // 形态学操作辅助函数
+    void MorphologicalDilation(int structSize = 3); // 膨胀操作
+    void MorphologicalErosion(int structSize = 3);  // 腐蚀操作
+    void MorphologicalOpening(int structSize = 3);  // 开运算
+    void MorphologicalClosing(int structSize = 3);  // 闭运算
+
     // 图像操作
     void Add(CImageProc& img, double weight1, double weight2); // 图像相加
     void Multiply(CImageProc& img);    // 图像相乘
