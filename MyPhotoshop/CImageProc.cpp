@@ -775,6 +775,10 @@ void CImageProc::ApplyCLAHE(int tileSize, double clipLimit)
     std::vector<BYTE> srcG(width * height);
     std::vector<BYTE> srcB(width * height);
 
+    // 计算原始图像的平均亮度，用于后续亮度校正
+    double avgBrightness = 0.0;
+    int pixelCount = 0;
+
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             BYTE red, green, blue;
@@ -784,8 +788,15 @@ void CImageProc::ApplyCLAHE(int tileSize, double clipLimit)
             srcR[idx] = red;
             srcG[idx] = green;
             srcB[idx] = blue;
+            
+            // 计算亮度（使用加权平均）
+            avgBrightness += (0.299 * red + 0.587 * green + 0.114 * blue);
+            pixelCount++;
         }
     }
+    
+    // 计算平均亮度
+    avgBrightness /= pixelCount;
 
     // 对每个通道分别处理
     auto processChannel = [&](const std::vector<BYTE>& src, std::vector<BYTE>& result) {
@@ -859,9 +870,19 @@ void CImageProc::ApplyCLAHE(int tileSize, double clipLimit)
                 cdf[i] = cdf[i-1] + tileHistograms[tileIdx][i] / static_cast<double>(numPixels);
             }
             
-            // 创建映射函数
+            // 创建映射函数，添加亮度校正
             for (int i = 0; i < 256; ++i) {
-                mappingFunctions[tileIdx][i] = static_cast<int>(round(cdf[i] * 255.0));
+                // 修改映射函数，防止过亮
+                // 使用非线性映射，保留更多的暗部细节
+                double mappedValue = cdf[i] * 255.0;
+                
+                // 对X光图像特殊处理：压缩高亮度区域，增强中低亮度区域
+                if (mappedValue > 128) {
+                    // 高亮度区域使用对数压缩
+                    mappedValue = 128 + 127 * log(1 + (mappedValue - 128) / 127) / log(2);
+                }
+                
+                mappingFunctions[tileIdx][i] = static_cast<int>(round(mappedValue));
             }
         }
         
@@ -913,12 +934,39 @@ void CImageProc::ApplyCLAHE(int tileSize, double clipLimit)
     processChannel(srcG, resultG);
     processChannel(srcB, resultB);
 
-    // 将结果写回图像
+    // 将结果写回图像，并应用全局亮度校正
+    double targetBrightness = min(avgBrightness * 0.9, 128.0); // 目标亮度略低于原图，但不超过128
+    double resultAvgBrightness = 0.0;
+    
+    // 先计算结果图像的平均亮度
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             int idx = y * width + x;
+            resultAvgBrightness += (0.299 * resultR[idx] + 0.587 * resultG[idx] + 0.114 * resultB[idx]);
+        }
+    }
+    resultAvgBrightness /= pixelCount;
+    
+    // 计算亮度校正系数
+    double brightnessRatio = targetBrightness / resultAvgBrightness;
+    
+    // 应用亮度校正并写回图像
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int idx = y * width + x;
+            
+            // 应用亮度校正
+            int correctedR = static_cast<int>(round(resultR[idx] * brightnessRatio));
+            int correctedG = static_cast<int>(round(resultG[idx] * brightnessRatio));
+            int correctedB = static_cast<int>(round(resultB[idx] * brightnessRatio));
+            
+            // 确保值在0-255范围内
+            correctedR = max(0, min(255, correctedR));
+            correctedG = max(0, min(255, correctedG));
+            correctedB = max(0, min(255, correctedB));
+            
             BYTE* pixel = GetPixelPtr(x, y);
-            SetColor(pixel, x, y, resultR[idx], resultG[idx], resultB[idx]);
+            SetColor(pixel, x, y, static_cast<BYTE>(correctedR), static_cast<BYTE>(correctedG), static_cast<BYTE>(correctedB));
         }
     }
 }

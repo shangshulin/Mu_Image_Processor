@@ -48,6 +48,7 @@ BEGIN_MESSAGE_MAP(CMyPhotoshopView, CView)
     ON_COMMAND(ID_FUNCTION_HISTOGRAM_MATCHING, &CMyPhotoshopView::OnFunctionHistogramMatching) // 直方图规格化
     ON_COMMAND(ID_COLOR_STYLE_VINTAGE, &CMyPhotoshopView::OnColorStyleVintage)// 复古风格
     ON_COMMAND(ID_STYLE_BLACKWHITE, &CMyPhotoshopView::OnStyleBlackwhite)// 黑白风格
+	ON_COMMAND(ID_CLAHE, &CMyPhotoshopView::OnCLAHE)    // 对比度受限自适应直方图均衡化
     //边缘检测
     ON_COMMAND(ID_EDGE_SOBEL, &CMyPhotoshopView::OnEdgeDetectionSobel)// 边缘检测-Sobel算子
     ON_COMMAND(ID_EDGE_PREWITT, &CMyPhotoshopView::OnEdgeDetectionPrewitt)// 边缘检测-Prewitt算子
@@ -68,7 +69,7 @@ BEGIN_MESSAGE_MAP(CMyPhotoshopView, CView)
 	ON_COMMAND(ID_FILTER_MEDIAN, OnFilterMedian)// 中值滤波
 	ON_COMMAND(ID_FILTER_MAX, OnFilterMax)// 最大值滤波
     // 频域滤波
-    ON_COMMAND(ID_HIGHPASS_FILTER, &CMyPhotoshopView::OnFreqPassFilter)     //高通/低通滤波
+    ON_COMMAND(ID_BANDPASS_FILTER, &CMyPhotoshopView::OnFreqPassFilter)     //高通/低通滤波
     ON_COMMAND(ID_HOMOMORPHIC_FILTERING, &CMyPhotoshopView::OnHomomorphicFiltering)    //同态滤波
 	// 撤销操作
     ON_COMMAND(ID_EDIT_UNDO, &CMyPhotoshopView::OnEditUndo)
@@ -1620,5 +1621,32 @@ void CMyPhotoshopView::OnXrayEnhancement()
     }
     catch (...) {
         AfxMessageBox(_T("图像增强操作失败"));
+    }
+}
+
+void CMyPhotoshopView::OnCLAHE()
+{
+    CMyPhotoshopDoc* pDoc = GetDocument();
+    if (!pDoc || !pDoc->pImage) return;
+
+    try {
+        CImageProc* pOldImage = new CImageProc();
+        *pOldImage = *pDoc->pImage;
+
+        AddCommand(
+			[pDoc]() {
+				// 应用自适应直方图均衡化
+				pDoc->pImage->ApplyCLAHE(16, 2.5);
+                pDoc->UpdateAllViews(nullptr);
+            },
+            [pDoc, pOldImage]() {
+                *pDoc->pImage = *pOldImage;
+                delete pOldImage;
+                pDoc->UpdateAllViews(nullptr);
+            }
+        );
+    }
+    catch (...) {
+        AfxMessageBox(_T("CLAHE操作失败"));
     }
 }

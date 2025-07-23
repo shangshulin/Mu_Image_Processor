@@ -72,6 +72,7 @@ public:
 	afx_msg void OnFunctionHistogramMatching(); // 直方图规格化菜单项的处理函数
 	afx_msg void OnColorStyleVintage();
 	afx_msg void OnStyleBlackwhite();
+	afx_msg void OnCLAHE();	// CLAHE直方图均衡化菜单项的处理函数
 	//灰度变换
 	afx_msg void OnIntensityTrans();
 	//添加噪声

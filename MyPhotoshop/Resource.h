@@ -112,7 +112,7 @@
 #define ID_FREQ_UNDO                    32820
 #define ID_32824                        32824
 #define ID_FREQ_FFT_LOG                 32825
-#define ID_HIGHPASS_FILTER              32826
+#define ID_BANDPASS_FILTER              32826
 #define ID_32827                        32827
 #define ID_LOWPASS_FILTER               32828
 #define ID_HOMOMORPHIC_FILTERING        32829
@@ -130,17 +130,18 @@
 #define ID_COSINE_DECODE                32844
 #define ID_COM_PREHENSIVE_ENCODE        32845
 #define ID_COM_PREHENSIVE_DECODE        32846
-#define ID_XrayEnhancement              32846
-#define ID_RL_Encode                    32847
-#define ID_RL_Decode                    32848
-#define ID_CLAHE                        32849
+#define ID_XrayEnhancement              32847
+#define ID_RL_Encode                    32848
+#define ID_BANDPASS_FILTER              32848
+#define ID_RL_Decode                    32849
+#define ID_CLAHE                        32850
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        331
-#define _APS_NEXT_COMMAND_VALUE         32848
+#define _APS_NEXT_COMMAND_VALUE         32849
 #define _APS_NEXT_CONTROL_VALUE         1039
 #define _APS_NEXT_SYMED_VALUE           329
 #endif
