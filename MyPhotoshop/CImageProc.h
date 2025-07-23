@@ -27,7 +27,6 @@ public:
     //图片加载与显示
     void OpenFile();
     void LoadBmp(CString stFileName);
-    bool SaveBmp(CString stFileName); // 保存图像
     void ShowBMP(CDC* pDC, int x, int y, int destWidth, int destHeight);
     BYTE* GetPixelPtr(int x, int y);
     void DisplayColor(CClientDC* pDC,int imgX, int imgY, int x, int y);
