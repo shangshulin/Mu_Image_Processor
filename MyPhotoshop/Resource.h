@@ -132,7 +132,6 @@
 #define ID_COM_PREHENSIVE_DECODE        32846
 #define ID_XrayEnhancement              32847
 #define ID_RL_Encode                    32848
-#define ID_BANDPASS_FILTER              32848
 #define ID_RL_Decode                    32849
 #define ID_CLAHE                        32850
 
