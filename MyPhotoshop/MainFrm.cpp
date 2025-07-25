@@ -74,6 +74,23 @@ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
 	// TODO: 在此处通过修改
 	//  CREATESTRUCT cs 来修改窗口类或样式
 
+	cs.dwExStyle |= WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_CLIENTEDGE | WS_EX_ACCEPTFILES;  // 添加客户端边缘
+
+
+	// 修改窗口初始大小和位置
+	// 获取屏幕尺寸
+	int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+	// 设置窗口大小
+	int windowWidth = 1300;
+	int windowHeight = 1200;
+
+	// 计算居中位置
+	cs.x = (screenWidth - windowWidth) / 2;
+	cs.y = (screenHeight - windowHeight) / 2;
+	cs.cx = windowWidth;
+	cs.cy = windowHeight;
 	return TRUE;
 }
 
